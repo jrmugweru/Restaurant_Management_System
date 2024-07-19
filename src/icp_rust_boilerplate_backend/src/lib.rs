@@ -330,9 +330,7 @@ fn get_restaurant_by_id(id: u64) -> Result<Restaurant, Message> {
     RESTAURANT_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, restaurant)| restaurant.id == id)
-            .map(|(_, restaurant)| restaurant.clone())
+            .get(&id)
             .ok_or(Message::NotFound("Restaurant not found".to_string()))
     })
 }
@@ -348,9 +346,7 @@ fn create_staff(payload: StaffPayload) -> Result<Staff, Message> {
     let restaurant = RESTAURANT_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, restaurant)| restaurant.id == payload.restaurant_id)
-            .map(|(_, restaurant)| restaurant.clone())
+            .get(&payload.restaurant_id)
     });
     if restaurant.is_none() {
         return Err(Message::NotFound("Restaurant not found".to_string()));
@@ -397,9 +393,7 @@ fn get_staff_by_id(id: u64) -> Result<Staff, Message> {
     STAFF_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, staff)| staff.id == id)
-            .map(|(_, staff)| staff.clone())
+            .get(&id)
             .ok_or(Message::NotFound("Staff not found".to_string()))
     })
 }
@@ -415,9 +409,7 @@ fn create_menu_item(payload: MenuItemPayload) -> Result<MenuItem, Message> {
     let restaurant = RESTAURANT_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, restaurant)| restaurant.id == payload.restaurant_id)
-            .map(|(_, restaurant)| restaurant.clone())
+            .get(&payload.restaurant_id)
     });
     if restaurant.is_none() {
         return Err(Message::NotFound("Restaurant not found".to_string()));
@@ -464,9 +456,7 @@ fn get_menu_item_by_id(id: u64) -> Result<MenuItem, Message> {
     MENU_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, item)| item.id == id)
-            .map(|(_, item)| item.clone())
+            .get(&id)
             .ok_or(Message::NotFound("Menu item not found".to_string()))
     })
 }
@@ -482,9 +472,7 @@ fn create_order(payload: OrderPayload) -> Result<Order, Message> {
     let restaurant = RESTAURANT_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, restaurant)| restaurant.id == payload.restaurant_id)
-            .map(|(_, restaurant)| restaurant.clone())
+            .get(&payload.restaurant_id)
     });
     if restaurant.is_none() {
         return Err(Message::NotFound("Restaurant not found".to_string()));
@@ -492,10 +480,7 @@ fn create_order(payload: OrderPayload) -> Result<Order, Message> {
 
     for item_id in &payload.items {
         let item_exists = MENU_STORAGE.with(|storage| {
-            storage
-                .borrow()
-                .iter()
-                .any(|(_, item)| item.id == *item_id)
+            storage.borrow().get(&item_id).is_some()
         });
         if !item_exists {
             return Err(Message::NotFound(format!("Menu item with ID {} not found", item_id)));
@@ -543,9 +528,7 @@ fn get_order_by_id(id: u64) -> Result<Order, Message> {
     ORDER_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, order)| order.id == id)
-            .map(|(_, order)| order.clone())
+            .get(&id)
             .ok_or(Message::NotFound("Order not found".to_string()))
     })
 }
@@ -561,9 +544,7 @@ fn create_reservation(payload: ReservationPayload) -> Result<Reservation, Messag
     let restaurant = RESTAURANT_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, restaurant)| restaurant.id == payload.restaurant_id)
-            .map(|(_, restaurant)| restaurant.clone())
+            .get(&payload.restaurant_id)
     });
     if restaurant.is_none() {
         return Err(Message::NotFound("Restaurant not found".to_string()));
@@ -609,9 +590,7 @@ fn get_reservation_by_id(id: u64) -> Result<Reservation, Message> {
     RESERVATION_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, reservation)| reservation.id == id)
-            .map(|(_, reservation)| reservation.clone())
+            .get(&id)
             .ok_or(Message::NotFound("Reservation not found".to_string()))
     })
 }
@@ -627,9 +606,7 @@ fn create_inventory_item(payload: InventoryItemPayload) -> Result<InventoryItem,
     let restaurant = RESTAURANT_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, restaurant)| restaurant.id == payload.restaurant_id)
-            .map(|(_, restaurant)| restaurant.clone())
+            .get(&payload.restaurant_id)
     });
     if restaurant.is_none() {
         return Err(Message::NotFound("Restaurant not found".to_string()));
@@ -675,9 +652,7 @@ fn get_inventory_item_by_id(id: u64) -> Result<InventoryItem, Message> {
     INVENTORY_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, item)| item.id == id)
-            .map(|(_, item)| item.clone())
+            .get(&id)
             .ok_or(Message::NotFound("Inventory item not found".to_string()))
     })
 }
@@ -693,9 +668,7 @@ fn create_expense(payload: ExpensePayload) -> Result<Expense, Message> {
     let restaurant = RESTAURANT_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, restaurant)| restaurant.id == payload.restaurant_id)
-            .map(|(_, restaurant)| restaurant.clone())
+            .get(&payload.restaurant_id)
     });
     if restaurant.is_none() {
         return Err(Message::NotFound("Restaurant not found".to_string()));
@@ -741,10 +714,44 @@ fn get_expense_by_id(id: u64) -> Result<Expense, Message> {
     EXPENSE_STORAGE.with(|storage| {
         storage
             .borrow()
-            .iter()
-            .find(|(_, expense)| expense.id == id)
-            .map(|(_, expense)| expense.clone())
+            .get(&id)
             .ok_or(Message::NotFound("Expense not found".to_string()))
+    })
+}
+
+#[ic_cdk::update]
+fn update_order_status(order_id: u64, new_status: String) -> Result<Order, Message> {
+    if new_status.is_empty() {
+        return Err(Message::InvalidPayload("Ensure 'status' is provided.".to_string()));
+    }
+
+    ORDER_STORAGE.with(|storage| {
+        let mut storage = storage.borrow_mut();
+        if let Some(mut order) = storage.remove(&order_id) {
+            order.status = new_status.clone();
+            storage.insert(order_id, order.clone());
+            Ok(order)
+        } else {
+            Err(Message::NotFound("Order not found".to_string()))
+        }
+    })
+}
+
+#[ic_cdk::query]
+fn get_orders_by_status(status: String) -> Result<Vec<Order>, Message> {
+    ORDER_STORAGE.with(|storage| {
+        let orders: Vec<Order> = storage
+            .borrow()
+            .iter()
+            .filter(|(_, order)| order.status == status)
+            .map(|(_, order)| order.clone())
+            .collect();
+
+        if orders.is_empty() {
+            Err(Message::NotFound(format!("No orders found with status '{}'", status)))
+        } else {
+            Ok(orders)
+        }
     })
 }
 
